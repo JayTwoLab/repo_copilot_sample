@@ -1,0 +1,18 @@
+{
+  // Copilot 에이전트가 터미널 도구를 실행하기 전 파괴적인 명령어를 방지하고, 코드 수정 후 코드 포맷터(clang-format)를 강제 실행합니다.
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "if [[ \"$TOOL_INPUT\" =~ (rm\\ -rf|git\\ reset\\ --hard|mkfs) ]]; then echo 'Dangerous command blocked!' && exit 1; fi"
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "bash": "find src include -name '*.cpp' -o -name '*.hpp' | xargs clang-format -i"
+      }
+    ]
+  }
+}

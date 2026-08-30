@@ -1,0 +1,26 @@
+# Build directories
+build/
+bin/
+lib/
+out/
+cmake-build-*/
+.cache/
+
+# Compiled outputs
+*.o
+*.obj
+*.so
+*.dll
+*.dylib
+*.a
+*.lib
+
+# Third-party dependencies
+external/
+vcpkg_installed/
+submodules/
+
+# Secrets & Environment
+.env*
+*.pem
+*.key
