@@ -20,6 +20,8 @@
 
 ## 파일 구성
 
+---
+
 ### `.github/copilot-instructions.md`
 - `Copilot Chat`과 코드 제안 시 저장소 전반에 적용할 규칙을 정의합니다.
 - 프로젝트의 기술 스택, 코딩 표준, 아키텍처 규칙, 테스트 작성 방식 등을 자연어로 작성하면 Copilot이 응답 및 코드 생성 시 이를 참조합니다.
@@ -44,6 +46,8 @@
 
 <br />
 
+---
+
 ### `.github/copilotignore`
 - 보안, 개인정보, 라이선스 등의 이유로 특정 경로의 코드를 Copilot이 읽지 못하도록 차단합니다.
 - `.gitignore`와 동일한 패턴 매칭 방식을 사용
@@ -64,10 +68,14 @@ dist/
 
 <br />
 
+---
+
 ### `.github/PULL_REQUEST_TEMPLATE.md`
 - `Copilot`이 `PR`(`Pull Request`) 생성 시 설명(`PR Summary`)을 자동 작성할 때 `.github/pull_request_template.md`에 정의된 섹션과 체크리스트 형식을 그대로 인식하여 템플릿에 맞게 내용을 채워줍니다.
 
 <br />
+
+---
 
 ### `.github/instructions/`
 - 규모가 큰 저장소에서는 단일 `copilot-instructions.md` 파일 대신 영역별로 지침 파일을 나누어 관리할 수 있습니다.
@@ -78,6 +86,8 @@ dist/
    - `.github/instructions/testing.instructions.md`: 테스트 코드 표준
 
 <br />
+
+---
 
 ### `.github/agents/`
 - `VS Code`나 `Visual Studio`, `Copilot CLI`의 `Agent` 모드에서 불러와 사용할 역할 맞춤형 `AI` 에이전트를 정의할 수 있습니다.
@@ -95,6 +105,8 @@ tools: ['read_file', 'list_dir']
 ```
 
 <br />
+
+---
 
 ### `.github/hooks/`
 - `Copilot Coding Agent`나 `CLI`가 동작할 때 특정 라이프사이클 이벤트(시작 전, 도구 실행 전/후 등)에 맞춰 셸 스크립트를 자동 실행하거나 위험 동작을 가로채는(`Intercept`) 미들웨어 역할을 설정합니다.
@@ -121,6 +133,8 @@ tools: ['read_file', 'list_dir']
 ```
 
 <br />
+
+---
 
 ### `.github/copilot/skills/`
 - `Copilot`이 반복적으로 수행해야 하는 특정 워크플로(예: 특정 배포 스크립트 실행, 사내 `API` 검증 등)를 `Agent Skill` 형태로 패키징해 저장소에 배치할 수 있습니다.
