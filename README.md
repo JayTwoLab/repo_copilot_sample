@@ -73,6 +73,29 @@ dist/
 ### `.github/PULL_REQUEST_TEMPLATE.md`
 - `Copilot`이 `PR`(`Pull Request`) 생성 시 설명(`PR Summary`)을 자동 작성할 때 `.github/pull_request_template.md`에 정의된 섹션과 체크리스트 형식을 그대로 인식하여 템플릿에 맞게 내용을 채워줍니다.
 
+```markdown
+## 📌 Summary
+<!-- Copilot will auto-fill a concise summary of changes here -->
+
+## 📦 Affected Subprojects
+- [ ] Core Engine
+- [ ] Network Module
+- [ ] CMake / Build Scripts
+- [ ] Unit Tests
+
+## 🔍 Key Changes
+<!-- List specific architectural or logic modifications -->
+
+## ⚠️ Memory & Thread-Safety Checklist
+- [ ] 메모리 누수 위험이 없는지 (RAII, Smart Pointers 확인)
+- [ ] 멀티스레드 동기화(Mutex/Lock)가 적절한지
+- [ ] CMake Target 가시성(PUBLIC/PRIVATE)이 올바르게 설정되었는지
+
+## 🧪 Testing Performed
+- [ ] CTest 실행 통과
+- [ ] AddressSanitizer (ASan) / ThreadSanitizer (TSan) 검증 여부
+```
+
 <br />
 
 ---
