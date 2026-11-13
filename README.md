@@ -1,77 +1,229 @@
-# Copilot 설정
+# GitHub Copilot 설정 가이드
 
-```
-.github/
-├── copilot-instructions.md          
-├── copilotignore                    
-├── PULL_REQUEST_TEMPLATE.md         
-├── instructions/                    
-│   ├── cmake.instructions.md        
-│   ├── core-engine.instructions.md  
-│   └── network-module.instructions.md
-├── agents/                          
-│   ├── memory-safety-reviewer.agent.md
-│   └── cmake-architect.agent.md     
-└── hooks/                           
-    └── safety.json                  
+```text
+project-root/
+├── AGENTS.md                                  # AI 에이전트 공통 운영 매뉴얼
+├── .vscode/
+│   └── mcp.json                               # IDE용 MCP 서버 연동 설정
+└── .github/
+    ├── copilot-instructions.md                # 저장소 전역 지침
+    ├── copilotignore                          # 컨텍스트 제외 설정 (보조 수단)
+    ├── PULL_REQUEST_TEMPLATE.md               # PR 자동 요약 템플릿
+    ├── workflows/
+    │   └── copilot-setup-steps.yml            # Copilot Coding Agent 실행 환경 설정
+    ├── instructions/                          # 파일/경로별 세부 지침
+    │   ├── cmake.instructions.md
+    │   ├── core-engine.instructions.md
+    │   └── network-module.instructions.md
+    ├── prompts/                               # 재사용 가능한 슬래시(/) 프롬프트
+    │   └── security-audit.prompt.md
+    ├── agents/                                # 역할 맞춤형 커스텀 에이전트
+    │   ├── memory-safety-reviewer.agent.md
+    │   └── cmake-architect.agent.md
+    ├── skills/                                # 작업별 에이전트 스킬 패키지
+    │   └── asan-crash-analyzer/
+    │       ├── SKILL.md
+    │       └── scripts/
+    └── hooks/                                 # 에이전트 라이프사이클 훅
+        └── safety.json
 ```
 
 <br />
 
-## 파일 구성
+## 파일 구성 및 상세 역할
 
 ---
 
-### `.github/copilot-instructions.md`
-- `Copilot Chat`과 코드 제안 시 저장소 전반에 적용할 규칙을 정의합니다.
-- 프로젝트의 기술 스택, 코딩 표준, 아키텍처 규칙, 테스트 작성 방식 등을 자연어로 작성하면 Copilot이 응답 및 코드 생성 시 이를 참조합니다.
+### 1. `.github/copilot-instructions.md`
+- `Copilot Chat`, 인라인 코드 제안, `Copilot Code Review` 수행 시 저장소 전반에 기본으로 적용할 전역 규칙을 정의합니다.
+- 프로젝트의 기술 스택, 코딩 표준, 아키텍처 원칙, 테스트 작성 방식 등을 자연어로 작성합니다.
 
 ```markdown
 <!-- .github/copilot-instructions.md 예시 -->
 # GitHub Copilot Instructions
 
-## Language & Framework
-- TypeScript, Next.js (App Router), Tailwind CSS를 기반으로 코드를 작성합니다.
-- 함수형 컴포넌트와 Hooks를 우선 사용합니다.
+## Language & Build System
+- C++20 표준과 CMake (3.25 이상)를 기반으로 코드를 작성합니다.
+- 모든 타겟은 Modern CMake 방식(`target_include_directories`, `target_link_libraries`)을 사용합니다.
 
-## Coding Style
-- 세미콜론(;)을 사용하지 않습니다.
-- 들여쓰기는 2칸(spaces)을 사용합니다.
-- 파일 및 컴포넌트 이름은 파스칼 케이스(PascalCase)를 따릅니다.
+## Coding Style & Memory Safety
+- Raw 포인터(`new`/`delete`) 사용을 금지하며, `std::unique_ptr`와 `std::shared_ptr` 및 RAII 패턴을 준수합니다.
+- 들여쓰기는 4칸(spaces)을 사용하며, 클래스명은 `PascalCase`, 함수 및 변수명은 `snake_case`를 따릅니다.
 
 ## Testing & Documentation
-- 모든 유틸리티 함수에는 Vitest를 이용한 단위 테스트를 작성합니다.
-- 함수 상단에는 JSDoc 형식으로 설명을 추가합니다.
+- 모든 핵심 로직에는 GoogleTest(GTest) 기반의 단위 테스트를 작성합니다.
+- 공개 헤더(`.hpp`)의 클래스와 함수 상단에는 Doxygen 형식의 주석을 추가합니다.
 ```
 
 <br />
 
 ---
 
-### `.github/copilotignore`
-- 보안, 개인정보, 라이선스 등의 이유로 특정 경로의 코드를 Copilot이 읽지 못하도록 차단합니다.
-- `.gitignore`와 동일한 패턴 매칭 방식을 사용
+### 2. `.github/instructions/*.instructions.md`
+- 규모가 큰 저장소에서 단일 `copilot-instructions.md` 대신 **특정 폴더나 파일 확장자별로 지침을 분리**하여 관리할 때 사용합니다.
+- 경로: `.github/instructions/**/*.instructions.md`
+- **핵심 규칙**: 파일 최상단 YAML 프론트매터에 `applyTo` (Glob 패턴)를 지정해야 해당 파일 작업 시 지침이 자동 로드됩니다. `excludeAgent` 속성으로 특정 에이전트(`code-review` 또는 `coding-agent`)에서의 실행을 제외할 수도 있습니다.
 
-```ignore
-# .github/copilotignore 예시
+```markdown
+---
+applyTo: "**/CMakeLists.txt,**/*.cmake"
+description: "CMake 빌드 스크립트 작성 규칙"
+---
 
-# 보안 및 환경 변수 관련
-.env*
-secrets/
-certs/
-
-# 대규모 데이터셋 또는 자동 생성 파일
-data/*.csv
-build/
-dist/
+# CMake 작성 지침
+- 전역 설정(`include_directories`, `link_libraries`)을 절대 사용하지 마세요.
+- 외부 라이브러리는 `FetchContent` 또는 `find_package(... CONFIG REQUIRED)`를 통해 가져옵니다.
+- 컴파일러 플래그는 `target_compile_options()`에 `PRIVATE` 또는 `INTERFACE`를 명시하여 설정합니다.
 ```
 
 <br />
 
 ---
 
-### `.github/PULL_REQUEST_TEMPLATE.md`
-- `Copilot`이 `PR`(`Pull Request`) 생성 시 설명(`PR Summary`)을 자동 작성할 때 `.github/pull_request_template.md`에 정의된 섹션과 체크리스트 형식을 그대로 인식하여 템플릿에 맞게 내용을 채워줍니다.
+### 3. `AGENTS.md`
+- 저장소 루트(또는 모노레포의 각 서브프로젝트 폴더)에 배치하며, GitHub Copilot뿐만 아니라 다양한 AI 에이전트가 공통으로 읽는 **에이전트 전용 README(운영 매뉴얼)**입니다.
+- 추상적인 설명보다 **실행 가능한 빌드/테스트 명령어**와 **절대 건드리면 안 되는 경계(Boundaries)**를 명확히 정의하는 것이 핵심입니다.
+
+```markdown
+# AGENTS.md
+
+## Build & Test Commands
+- 전체 빌드: `cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build -j`
+- 단위 테스트 실행: `ctest --test-dir build --output-on-failure`
+- 메모리 검증(ASan): `cmake -B build-asan -DENABLE_ASAN=ON && cmake --build build-asan && ctest --test-dir build-asan`
+
+## Boundaries (주의사항)
+- `third_party/` 및 `certs/` 디렉터리 내부 파일은 절대 수정하지 마세요.
+- 새로운 외부 의존성을 추가하기 전에는 반드시 사용자에게 먼저 확인을 받으세요.
+```
+
+<br />
+
+---
+
+### 4. `.github/prompts/*.prompt.md`
+- IDE의 Copilot Chat에서 `/프롬프트이름` 형태의 슬래시 명령어로 즉시 호출할 수 있는 **재사용 가능한 작업 템플릿**입니다.
+- 경로: `.github/prompts/<prompt-name>.prompt.md`
+
+```markdown
+---
+mode: "agent"
+tools: ["read_file", "search_code"]
+description: "선택한 코드의 스레드 안전성 및 메모리 누수를 점검합니다."
+---
+
+현재 열려 있는 파일(`#${file}`)을 분석하여 다음 항목을 중점적으로 점검하고 개선 코드를 제안해 주세요:
+1. 데이터 레이스(Data Race) 발생 가능성 및 `std::mutex` 잠금 범위의 적절성
+2. 예외 발생 시 자원 누수 여부 (RAII 준수 확인)
+3. 불필요한 깊은 복사(Deep Copy)가 발생하는 구간 (`std::move` 또는 `const&` 권장)
+```
+
+<br />
+
+---
+
+### 5. `.github/agents/*.agent.md`
+- VS Code, Visual Studio, Copilot CLI, GitHub Cloud Agent에서 호출할 수 있는 **역할 맞춤형 전문가 AI 에이전트**를 정의합니다.
+- 경로: `.github/agents/<agent-name>.agent.md`
+
+```markdown
+---
+name: memory-safety-reviewer
+description: C++ 메모리 안전성 및 동시성 이슈를 전문적으로 검토하는 에이전트
+tools: ["read_file", "list_dir", "search_code"]
+---
+
+당신은 고성능 C++ 시스템 소프트웨어의 시니어 보안 및 안정성 엔지니어입니다.
+작성된 코드에서 Dangling Pointer, Buffer Overflow, Deadlock, Use-After-Free 가능성을 최우선으로 탐지하고 수정 방안을 제시하세요.
+```
+
+<br />
+
+---
+
+### 6. `.github/skills/<skill-name>/SKILL.md`
+- Copilot(클라우드 에이전트, 코드 리뷰, CLI, IDE 에이전트 모드)이 특정 도메인 작업을 수행할 때 **필요에 따라 온디맨드(On-demand)로 불러오는 워크플로·스크립트·리소스 패키지**입니다.
+- 경로: `.github/skills/<skill-name>/SKILL.md` (폴더명과 `name` 필드는 소문자와 하이픈(`-`)만 사용)
+
+```markdown
+---
+name: asan-crash-analyzer
+description: AddressSanitizer(ASan) 로그를 분석하고 크래시 원인과 패치 코드를 제시할 때 사용합니다.
+---
+
+# ASan 크래시 분석 스킬
+
+1. 제공된 ASan 스택 트레이스에서 크래시 유형(`heap-use-after-free`, `stack-buffer-overflow` 등)을 식별합니다.
+2. `./scripts/parse_asan_log.py` 스크립트가 있다면 실행하여 심볼 위치를 추출합니다.
+3. 할당 해제 지점과 재접근 지점의 수명 주기(Lifecycle) 충돌 원인을 설명하고 수정 패치를 제안합니다.
+```
+
+<br />
+
+---
+
+### 7. `.github/hooks/*.json`
+- `Copilot Coding Agent`나 `Copilot CLI`가 동작할 때 특정 라이프사이클 이벤트(`sessionStart`, `preToolUse`, `postToolUse` 등)에 맞춰 셸 스크립트를 자동 실행하거나 위험 동작을 가로채는(`Intercept`) 미들웨어 역할을 수행합니다.
+- 경로: `.github/hooks/<hook-name>.json`
+
+```json
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "./scripts/verify-command.sh"
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "bash": "clang-format -i"
+      }
+    ]
+  }
+}
+```
+
+<br />
+
+---
+
+### 8. `.github/workflows/copilot-setup-steps.yml`
+- GitHub 이슈나 PR에서 동작하는 **Copilot Coding Agent(클라우드 에이전트)**가 코드를 빌드하고 테스트할 수 있도록 가상 환경(Runner)에 컴파일러, 패키지, 의존성을 사전 설치하는 전용 워크플로입니다.
+- **주의사항**: Job의 이름은 반드시 `copilot-setup-steps`여야 Copilot이 인식합니다.
+
+```yaml
+name: "Copilot Setup Steps"
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+jobs:
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install C++ & CMake toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build clang clang-tidy
+```
+
+<br />
+
+---
+
+### 9. `.github/PULL_REQUEST_TEMPLATE.md`
+- Copilot이 PR 요약(`Copilot PR Summary`)을 자동 생성하거나 Coding Agent가 PR을 올릴 때, 이 템플릿에 정의된 섹션과 체크리스트 구조를 인식하여 알맞게 내용을 채워줍니다.
 
 ```markdown
 ## 📌 Summary
@@ -100,66 +252,37 @@ dist/
 
 ---
 
-### `.github/instructions/`
-- 규모가 큰 저장소에서는 단일 `copilot-instructions.md` 파일 대신 영역별로 지침 파일을 나누어 관리할 수 있습니다.
-- 경로: `.github/instructions/**/*.instructions.md`
-- 예시 구조
-   - `.github/instructions/backend.instructions.md`: 백엔드/API 작성 규칙
-   - `.github/instructions/frontend.instructions.md`: UI 컴포넌트 및 CSS 규칙
-   - `.github/instructions/testing.instructions.md`: 테스트 코드 표준
+### 10. `.github/copilotignore` 및 Content Exclusion
+- 보안, 개인정보, 라이선스 등의 이유로 특정 경로의 파일을 Copilot 컨텍스트에서 제외할 때 사용합니다.
+- **실무 팁**: 로컬 파일(`.copilotignore`)만으로는 IDE에 직접 열려 있는 파일의 참조를 완벽히 차단하기 어렵습니다. 보안이 중요한 파일은 반드시 **GitHub 저장소 또는 Organization 설정(`Settings` → `Copilot` → `Content exclusion`)**에서 경로를 등록해 서버/클라이언트 정책 레벨에서 차단하는 것을 권장합니다.
 
-<br />
+```ignore
+# 보안 및 환경 변수 관련
+.env*
+secrets/
+certs/
 
----
-
-### `.github/agents/`
-- `VS Code`나 `Visual Studio`, `Copilot CLI`의 `Agent` 모드에서 불러와 사용할 역할 맞춤형 `AI` 에이전트를 정의할 수 있습니다.
-   - 경로: `.github/agents/<agent-name>.agent.md`
-   - 예시: `.github/agents/code-reviewer.agent.md`
-```markdown
----
-name: CodeReviewer
-description: 보안 및 성능 관점에서 코드를 리뷰하는 에이전트
-tools: ['read_file', 'list_dir']
----
-
-당신은 시니어 보안 엔지니어입니다.
-작성된 코드의 SQL Injection, XSS, 권한 검증 누락 여부를 중점적으로 검토하세요.
+# 대규모 데이터셋 또는 빌드 산출물
+data/*.csv
+build/
+dist/
 ```
 
 <br />
 
 ---
 
-### `.github/hooks/`
-- `Copilot Coding Agent`나 `CLI`가 동작할 때 특정 라이프사이클 이벤트(시작 전, 도구 실행 전/후 등)에 맞춰 셸 스크립트를 자동 실행하거나 위험 동작을 가로채는(`Intercept`) 미들웨어 역할을 설정합니다.
-   - 경로: `.github/hooks/<hook-name>.json`
-   - 예시: `.github/hooks/safety.json`
+### 11. `.vscode/mcp.json` (MCP 서버 연동)
+- Copilot Agent 모드에서 외부 도구(사내 위키, 이슈 트래커, 데이터베이스, 브라우저 제어 등)를 호출할 수 있도록 **Model Context Protocol(MCP)** 서버를 프로젝트 단위로 설정합니다.
+- GitHub 웹 환경(Coding Agent 및 Code Review)에서 사용할 MCP 서버는 저장소의 `Settings` → `Copilot` → `MCP servers`에서 설정합니다.
+
 ```json
 {
-  "version": 1,
-  "hooks": {
-    "preToolUse": [
-      {
-        "type": "command",
-        "bash": "./scripts/verify-command.sh"
-      }
-    ],
-    "postToolUse": [
-      {
-        "type": "command",
-        "bash": "npm run lint"
-      }
-    ]
+  "servers": {
+    "github": {
+      "type": "http",
+      "url": "[https://api.githubcopilot.com/mcp/](https://api.githubcopilot.com/mcp/)"
+    }
   }
 }
 ```
-
-<br />
-
----
-
-### `.github/copilot/skills/`
-- `Copilot`이 반복적으로 수행해야 하는 특정 워크플로(예: 특정 배포 스크립트 실행, 사내 `API` 검증 등)를 `Agent Skill` 형태로 패키징해 저장소에 배치할 수 있습니다.
-   - 경로: `.github/copilot/skills/<skill-name>/`
-
